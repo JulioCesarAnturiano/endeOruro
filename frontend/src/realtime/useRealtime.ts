@@ -17,6 +17,7 @@ export function useRealtime() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const micRef = useRef<MediaStreamTrack | null>(null);
+  const senderRef = useRef<RTCRtpSender | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -65,11 +66,11 @@ export function useRealtime() {
 
   const disconnect = useCallback(() => {
     dcRef.current?.close();
-    pcRef.current?.getSenders().forEach((s) => s.track?.stop());
+    micRef.current?.stop();
     pcRef.current?.close();
     audioCtxRef.current?.close();
     if (audioElRef.current) audioElRef.current.srcObject = null;
-    pcRef.current = dcRef.current = micRef.current = audioCtxRef.current = analyserRef.current = null;
+    pcRef.current = dcRef.current = micRef.current = senderRef.current = audioCtxRef.current = analyserRef.current = null;
     setMicOn(false);
     setStatus("idle");
   }, []);
@@ -102,16 +103,9 @@ export function useRealtime() {
         analyserRef.current = analyser;
       };
 
-      // Micrófono: empieza apagado; si el usuario lo niega se sigue solo con texto
-      try {
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const track = mic.getAudioTracks()[0];
-        track.enabled = false;
-        micRef.current = track;
-        pc.addTrack(track, mic);
-      } catch {
-        pc.addTransceiver("audio", { direction: "recvonly" });
-      }
+      // Canal de audio de ida y vuelta, sin pista todavía: el micrófono se pide
+      // recién cuando el usuario lo activa y se engancha sin renegociar.
+      senderRef.current = pc.addTransceiver("audio", { direction: "sendrecv" }).sender;
 
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
@@ -153,14 +147,35 @@ export function useRealtime() {
     [upsert],
   );
 
-  const toggleMic = useCallback(() => {
-    const track = micRef.current;
-    if (!track) {
-      setError("No hay acceso al micrófono. Revisa los permisos del navegador.");
+  const toggleMic = useCallback(async () => {
+    const sender = senderRef.current;
+    if (!sender) return;
+    setError(null);
+    if (!micRef.current) {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Este navegador no permite usar el micrófono aquí. Abre la página en Chrome o Safari.");
+        return;
+      }
+      try {
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        const track = mic.getAudioTracks()[0];
+        await sender.replaceTrack(track);
+        micRef.current = track;
+        setMicOn(true);
+      } catch (err) {
+        const name = err instanceof DOMException ? err.name : "";
+        setError(
+          name === "NotAllowedError"
+            ? "Permiso de micrófono denegado. Actívalo en el candado de la barra de direcciones y en Ajustes del Sistema → Privacidad → Micrófono."
+            : name === "NotFoundError"
+              ? "No se encontró ningún micrófono conectado."
+              : `No se pudo abrir el micrófono (${name || "error desconocido"}).`,
+        );
+      }
       return;
     }
-    track.enabled = !track.enabled;
-    setMicOn(track.enabled);
+    micRef.current.enabled = !micRef.current.enabled;
+    setMicOn(micRef.current.enabled);
   }, []);
 
   useEffect(() => disconnect, [disconnect]);

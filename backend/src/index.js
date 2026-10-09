@@ -6,7 +6,7 @@ import { INSTRUCTIONS } from "./instructions.js";
 const { OPENAI_API_KEY, OPENAI_REALTIME_MODEL = "gpt-realtime", OPENAI_VOICE = "cedar", PORT = 3001 } = process.env;
 
 if (!OPENAI_API_KEY) {
-  console.error("Falta OPENAI_API_KEY. Copia .env.example como .env y pon tu clave.");
+  console.error("Falta OPENAI_API_KEY. Copia backend/.env.example como backend/.env y pon tu clave.");
   process.exit(1);
 }
 
@@ -44,7 +44,7 @@ app.post("/api/session", async (_req, res) => {
 });
 
 // En producción sirve el frontend compilado (npm run build)
-const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
+const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend", "dist");
 app.use(express.static(dist));
 
 app.listen(PORT, () => console.log(`Servidor en http://localhost:${PORT}`));
