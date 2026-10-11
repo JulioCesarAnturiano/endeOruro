@@ -42,6 +42,22 @@ export function useRealtime() {
         case "response.created":
           setStatus("thinking");
           break;
+        case "conversation.item.added":
+        case "conversation.item.created":
+          // La transcripción del usuario llega después de que empieza la respuesta:
+          // se reserva su lugar al crearse el ítem para que quede antes de la respuesta.
+          if (ev.item?.role === "user" && ev.item.id) {
+            const id: string = ev.item.id;
+            const prevId: string | null | undefined = ev.previous_item_id;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === id)) return prev;
+              const at = prevId ? prev.findIndex((m) => m.id === prevId) : -1;
+              const slot = { id, role: "user" as const, text: "" };
+              if (at === -1) return [...prev, slot];
+              return [...prev.slice(0, at + 1), slot, ...prev.slice(at + 1)];
+            });
+          }
+          break;
         case "conversation.item.input_audio_transcription.completed":
           if (ev.transcript?.trim()) upsert(ev.item_id, "user", ev.transcript.trim(), true);
           break;
@@ -180,5 +196,8 @@ export function useRealtime() {
 
   useEffect(() => disconnect, [disconnect]);
 
-  return { status, messages, micOn, error, analyserRef, connect, disconnect, sendText, toggleMic };
+  // Los ítems de voz sin transcribir todavía solo reservan su posición
+  const visibleMessages = messages.filter((m) => m.text);
+
+  return { status, messages: visibleMessages, micOn, error, analyserRef, connect, disconnect, sendText, toggleMic };
 }
