@@ -1,0 +1,30 @@
+# Despliegue: la app (API + frontend) detrás de Caddy, que obtiene y renueva solo el certificado HTTPS.
+# Requiere un archivo .env en la raíz con DOMAIN=... (ver .env.example) y backend/.env con la API key.
+services:
+  app:
+    build: .
+    env_file: backend/.env
+    environment:
+      PORT: 3001
+    restart: unless-stopped
+    # Sin "ports": solo Caddy la alcanza por la red interna de Docker
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Falta DOMAIN en el archivo .env de la raíz}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # guarda los certificados; sin esto se piden de nuevo en cada reinicio
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

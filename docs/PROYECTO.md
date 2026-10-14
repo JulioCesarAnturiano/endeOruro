@@ -52,6 +52,9 @@ endeOruro/
 ├─ CLAUDE.md                 contexto para Claude Code
 ├─ docs/PROYECTO.md          este documento
 ├─ package.json              workspaces + "npm run dev" para ambos
+├─ Dockerfile, .dockerignore imagen de producción (ver sección 7)
+├─ docker-compose.yml        app + Caddy (HTTPS automático)
+├─ Caddyfile, .env.example   dominio público del despliegue
 ├─ assets-src/
 │  └─ mascota_ende.blend     fuente editable: malla, rig, animaciones, texturas empaquetadas
 ├─ backend/
@@ -178,11 +181,29 @@ npm start          # el backend sirve la API y el frontend compilado
 
 Vite redirige `/api` al backend en desarrollo. El micrófono requiere Chrome o Safari: el navegador integrado de VS Code no lo permite.
 
+### Despliegue con Docker
+
+El navegador solo da acceso al micrófono con HTTPS (o en `localhost`), así que la app necesita un dominio con certificado. Para el festival se usa un subdominio gratis de **DuckDNS**; cuando ENDE dé su dominio oficial basta con cambiar `DOMAIN`.
+
+- `Dockerfile`: dos etapas. Compila el frontend y deja una imagen con solo el backend, Express y `frontend/dist`. Las variables llegan desde `docker-compose.yml`; no hay `.env` dentro de la imagen.
+- `docker-compose.yml`: el servicio `app` (puerto 3001, solo interno) y `caddy` (puertos 80 y 443), que pide y renueva el certificado de Let's Encrypt. Los certificados se guardan en el volumen `caddy_data`.
+
+Pasos en el servidor Linux:
+
+1. Entrar a https://www.duckdns.org con una cuenta de Google o GitHub, crear el subdominio (p. ej. `endeoruro`) y poner la IP pública del servidor.
+2. Abrir los puertos 80 y 443 en el firewall del servidor y del proveedor (Let's Encrypt valida por el 80).
+3. Instalar Docker con el plugin compose y clonar el repositorio.
+4. Crear `backend/.env` con la API key (copiar desde `backend/.env.example`) y `.env` en la raíz con `DOMAIN=endeoruro.duckdns.org` (copiar desde `.env.example`).
+5. `docker compose up -d --build`. La primera vez Caddy tarda unos segundos en obtener el certificado; `docker compose logs -f caddy` lo muestra.
+
+Para actualizar: `git pull && docker compose up -d --build`. Para cambiar la clave o la voz: editar `backend/.env` y `docker compose up -d`.
+
 ## 8. Decisiones tomadas
 
 - **WebRTC directo con OpenAI** en lugar de encadenar transcripción, chat y síntesis de voz: menor latencia y cortes naturales cuando el usuario interrumpe.
 - **Backend mínimo**: existe solo para proteger la API key. Se descartó una carpeta de base de datos porque los datos llegarán por una API externa.
 - **Sin saludo**: el clip `Wave` se quitó a pedido del cliente y se reemplazó por la entrada con rayo.
+- **Docker + Caddy + DuckDNS para desplegar**: misma versión de Node en cualquier servidor, HTTPS automático y un dominio gratis y legible para el festival. Se prefirió DuckDNS sobre sslip.io porque el nombre es fácil de escribir o poner en un QR y su límite de certificados es por subdominio, no compartido.
 - **Fondo y trueno generados por código** para no depender de material externo mientras no haya fotos oficiales.
 
 ## 9. Pendientes y limitaciones
@@ -192,7 +213,7 @@ Vite redirige `/api` al backend en desarrollo. El micrófono requiere Chrome o S
 - **Contenido del bot**: completar `backend/src/instructions.js` con servicios, horarios y preguntas frecuentes.
 - **API de ENDE**: cuando esté disponible, exponerla al modelo como herramienta (function calling): el modelo pide el dato, el sistema consulta la API y el modelo responde con el resultado.
 - **Material gráfico**: foto o ilustración real de una subestación de ENDE en Oruro (horizontal, mínimo 1920×1080) y, opcionalmente, un sonido de trueno libre de derechos.
-- **Despliegue**: hosting con HTTPS, necesario para el micrófono fuera de `localhost`.
+- **Despliegue**: listo con Docker y DuckDNS (sección 7). Falta elegir el servidor y, a futuro, pasar al dominio oficial de ENDE.
 - **Licencia**: confirmar que el plan de Tripo usado permite uso comercial del modelo, ya que lleva la marca ENDE.
 
 ### Limitaciones conocidas

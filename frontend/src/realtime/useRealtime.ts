@@ -150,7 +150,8 @@ export function useRealtime() {
     (text: string) => {
       const dc = dcRef.current;
       if (!dc || dc.readyState !== "open" || !text.trim()) return;
-      upsert(crypto.randomUUID(), "user", text.trim());
+      // No crypto.randomUUID(): solo existe con HTTPS y rompería el envío de texto por HTTP
+      upsert(`local-${Date.now()}-${Math.random().toString(36).slice(2)}`, "user", text.trim());
       dc.send(
         JSON.stringify({
           type: "conversation.item.create",
