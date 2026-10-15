@@ -29,10 +29,11 @@ flowchart LR
 ```
 
 1. El usuario pulsa **Iniciar conversación**.
-2. El frontend llama a `POST /api/session`. El backend crea la sesión en OpenAI (modelo, voz, instrucciones y transcripción) y devuelve la clave efímera.
+2. El frontend llama a `POST /api/session` con el nombre recordado, si lo hay. El backend crea la sesión en OpenAI (modelo, voz, instrucciones, herramientas y transcripción) y devuelve la clave efímera.
 3. El frontend crea un `RTCPeerConnection` con un transceptor de audio y un canal de datos `oai-events`, y envía su oferta SDP a `https://api.openai.com/v1/realtime/calls?model=...`.
 4. El audio de respuesta llega como stream remoto: se reproduce y pasa por un `AnalyserNode` que mueve la mandíbula.
-5. El texto se envía por el canal de datos con `conversation.item.create` seguido de `response.create`.
+5. La mascota no habla al conectar: espera el primer mensaje de la persona.
+6. El texto se envía por el canal de datos con `conversation.item.create` seguido de `response.create`.
 
 ## 3. Tecnologías
 
@@ -62,7 +63,7 @@ endeOruro/
 │  ├─ package.json
 │  └─ src/
 │     ├─ index.js            POST /api/session y servido de frontend/dist
-│     └─ instructions.js     personalidad y conocimiento del bot
+│     └─ instructions.js     personalidad, conocimiento y herramienta guardar_nombre
 └─ frontend/
    ├─ index.html, vite.config.ts, tsconfig.json, package.json
    ├─ public/
@@ -156,6 +157,12 @@ El fogonazo es una animación CSS (`.stage__flash` en `styles.css`) cuyos porcen
 ### Micrófono
 
 La conexión se abre con un transceptor de audio `sendrecv` sin pista. El permiso se pide recién al pulsar **Activar micrófono** y la pista se engancha con `replaceTrack`, sin renegociar. Si falla, el panel muestra el motivo (permiso denegado, sin dispositivo o navegador no compatible).
+
+### Nombre de la persona
+
+La mascota no habla al conectar: espera a que la persona diga algo; en su primera respuesta la saluda, se presenta como la mascota de ENDE Oruro y le pregunta solo cómo se llama. Si no lo quiere decir, no insiste. Cuando la persona lo dice, el modelo llama a la herramienta `guardar_nombre`. El frontend lo guarda en `localStorage` (clave `ende.nombre`), lo muestra en la cabecera del chat, devuelve el `function_call_output` y pide una nueva respuesta para que la mascota la salude por su nombre. Las llamadas se procesan en `response.done`, porque no se puede crear otra respuesta mientras una sigue activa.
+
+En la siguiente conversación el frontend envía el nombre a `POST /api/session` y el backend lo agrega a las instrucciones, antes limpiándolo (solo letras, espacios, apóstrofos y guiones, máximo 40 caracteres). Como el mismo equipo lo usa mucha gente, la mascota no da el nombre por hecho: tras su primera respuesta pregunta "¿Eres Ana?" y, si no es, pide el nombre nuevo. Los textos están en `backend/src/instructions.js`.
 
 ### Orden de los mensajes
 

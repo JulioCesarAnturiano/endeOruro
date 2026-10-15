@@ -20,6 +20,7 @@ export default function App() {
       <ChatPanel
         status={rt.status}
         messages={rt.messages}
+        nombre={rt.nombre}
         micOn={rt.micOn}
         error={rt.error}
         onConnect={rt.connect}

@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { INSTRUCTIONS } from "./instructions.js";
+import { buildInstructions, TOOLS } from "./instructions.js";
 
 const { OPENAI_API_KEY, OPENAI_REALTIME_MODEL = "gpt-realtime", OPENAI_VOICE = "cedar", PORT = 3001 } = process.env;
 
@@ -11,10 +11,15 @@ if (!OPENAI_API_KEY) {
 }
 
 const app = express();
+app.use(express.json({ limit: "1kb" }));
+
+// El nombre llega del navegador y va dentro de las instrucciones: solo letras, espacios y guiones.
+const limpiarNombre = (v) =>
+  typeof v === "string" ? v.replace(/[^\p{L}\p{M} '’-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 40) : "";
 
 // El navegador nunca ve la API key: pide aquí una clave efímera de un solo uso
 // y con ella abre la conexión WebRTC directamente con OpenAI.
-app.post("/api/session", async (_req, res) => {
+app.post("/api/session", async (req, res) => {
   try {
     const r = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
       method: "POST",
@@ -23,7 +28,8 @@ app.post("/api/session", async (_req, res) => {
         session: {
           type: "realtime",
           model: OPENAI_REALTIME_MODEL,
-          instructions: INSTRUCTIONS,
+          instructions: buildInstructions(limpiarNombre(req.body?.nombre)),
+          tools: TOOLS,
           audio: {
             input: { transcription: { model: "gpt-4o-mini-transcribe", language: "es" } },
             output: { voice: OPENAI_VOICE },

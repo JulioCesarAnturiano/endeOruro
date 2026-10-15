@@ -12,6 +12,7 @@ const STATUS_LABEL: Record<Status, string> = {
 type Props = {
   status: Status;
   messages: Message[];
+  nombre: string;
   micOn: boolean;
   error: string | null;
   onConnect: () => void;
@@ -20,7 +21,7 @@ type Props = {
   onToggleMic: () => void;
 };
 
-export function ChatPanel({ status, messages, micOn, error, onConnect, onDisconnect, onSend, onToggleMic }: Props) {
+export function ChatPanel({ status, messages, nombre, micOn, error, onConnect, onDisconnect, onSend, onToggleMic }: Props) {
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const connected = status !== "idle" && status !== "connecting";
@@ -40,6 +41,7 @@ export function ChatPanel({ status, messages, micOn, error, onConnect, onDisconn
       <header className="chat__header">
         <span className={`dot dot--${status}`} />
         <span>{STATUS_LABEL[status]}</span>
+        {connected && nombre && <span className="chat__nombre">· {nombre}</span>}
         {connected && (
           <button className="link" onClick={onDisconnect}>
             Terminar
