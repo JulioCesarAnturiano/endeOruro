@@ -1,5 +1,5 @@
 # Etapa 1: compila el frontend (necesita las dependencias de desarrollo: Vite, TypeScript)
-FROM node:24-slim AS build
+FROM node:22-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/
@@ -9,7 +9,7 @@ COPY frontend frontend
 RUN npm run build
 
 # Etapa 2: imagen final, solo el backend con sus dependencias y el frontend compilado
-FROM node:24-slim
+FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
