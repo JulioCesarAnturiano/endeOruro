@@ -100,6 +100,7 @@ El personaje se generó desde una imagen de referencia con el modelo HD. La prim
 - Esqueleto de 28 huesos: `Hips`, `Spine`, `Chest`, `Neck`, `Head`, `Jaw`, `Ear.L/R`, `Shoulder`, `UpperArm`, `LowerArm`, `Hand`, `UpperLeg`, `LowerLeg`, `Foot`, `Toe` (lados `.L` y `.R`) y `Tail1` a `Tail4`. Eje de frente del personaje: -Y en Blender; altura total 0,98 m con los pies en Z = 0.
 - Pesos automáticos (bone heat) con dos correcciones: el caparazón y la espalda quedan rígidos al torso (solo `Hips`, `Spine`, `Chest` y la cola influyen ahí), y cada vértice tiene como máximo 4 huesos, el límite de glTF.
 - Se eliminaron 172 vértices sueltos que dejó el generador.
+- El caparazón se agrandó por script porque no se notaba (un 25 % más ancho, un 18 % más alto y un 40 % más abultado hacia atrás) para que asome por los costados vistos de frente. Solo se movieron vértices, con transición suave en los bordes; esqueleto y pesos sin cambios.
 - Se trabajó con scripts de Python en Blender sin interfaz, verificando con renders de poses de prueba.
 
 ### Animaciones en el GLB
