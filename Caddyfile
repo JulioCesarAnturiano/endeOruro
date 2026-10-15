@@ -1,3 +1,7 @@
+{
+	email juliocesaranturianoeulate@gmail.com
+}
+
 {$DOMAIN} {
 	encode gzip zstd
 	reverse_proxy app:3001
