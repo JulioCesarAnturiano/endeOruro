@@ -3,6 +3,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type Status = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 export type Message = { id: string; role: "user" | "assistant"; text: string };
 
+// Nombre de la última persona que conversó en este navegador.
+// localStorage puede fallar (navegación privada o datos bloqueados): entonces no se recuerda.
+const NOMBRE_KEY = "ende.nombre";
+const leerNombre = () => {
+  try {
+    return localStorage.getItem(NOMBRE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+const guardarNombre = (nombre: string) => {
+  try {
+    localStorage.setItem(NOMBRE_KEY, nombre);
+  } catch {
+    /* sin almacenamiento: solo se recuerda durante la conversación */
+  }
+};
+
 /**
  * Conversación en tiempo real con OpenAI por WebRTC.
  * El audio de respuesta llega como stream remoto; se expone un AnalyserNode
@@ -13,6 +31,7 @@ export function useRealtime() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [micOn, setMicOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nombre, setNombre] = useState(leerNombre);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -72,6 +91,36 @@ export function useRealtime() {
         case "output_audio_buffer.cleared":
           setStatus("listening");
           break;
+        case "response.done": {
+          // El modelo pide guardar el nombre: se guarda, se le confirma y se le pide seguir hablando.
+          // Se espera a response.done porque no se puede crear otra respuesta mientras hay una activa.
+          const calls = (ev.response?.output ?? []).filter((o: any) => o.type === "function_call");
+          if (!calls.length) break;
+          const dc = dcRef.current;
+          for (const call of calls) {
+            let output = { ok: false };
+            if (call.name === "guardar_nombre") {
+              try {
+                const n = String(JSON.parse(call.arguments).nombre ?? "").trim().slice(0, 40);
+                if (n) {
+                  guardarNombre(n);
+                  setNombre(n);
+                  output = { ok: true };
+                }
+              } catch {
+                /* argumentos inválidos: se responde ok: false */
+              }
+            }
+            dc?.send(
+              JSON.stringify({
+                type: "conversation.item.create",
+                item: { type: "function_call_output", call_id: call.call_id, output: JSON.stringify(output) },
+              }),
+            );
+          }
+          dc?.send(JSON.stringify({ type: "response.create" }));
+          break;
+        }
         case "error":
           setError(ev.error?.message ?? "Error en la sesión");
           break;
@@ -96,7 +145,11 @@ export function useRealtime() {
     setError(null);
     setStatus("connecting");
     try {
-      const session = await fetch("/api/session", { method: "POST" }).then(async (r) => {
+      const session = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: leerNombre() }),
+      }).then(async (r) => {
         const body = await r.json();
         if (!r.ok) throw new Error(body.error ?? "No se pudo crear la sesión");
         return body as { clientSecret: string; model: string };
@@ -126,6 +179,7 @@ export function useRealtime() {
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
       dc.onmessage = (e) => onEvent(JSON.parse(e.data));
+      // La mascota espera a que la persona hable primero
       dc.onopen = () => setStatus("listening");
       pc.onconnectionstatechange = () => {
         if (["failed", "closed", "disconnected"].includes(pc.connectionState)) disconnect();
@@ -200,5 +254,5 @@ export function useRealtime() {
   // Los ítems de voz sin transcribir todavía solo reservan su posición
   const visibleMessages = messages.filter((m) => m.text);
 
-  return { status, messages: visibleMessages, micOn, error, analyserRef, connect, disconnect, sendText, toggleMic };
+  return { status, messages: visibleMessages, nombre, micOn, error, analyserRef, connect, disconnect, sendText, toggleMic };
 }

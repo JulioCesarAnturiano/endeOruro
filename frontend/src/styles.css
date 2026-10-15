@@ -96,6 +96,11 @@ input {
   color: var(--muted);
 }
 
+.chat__nombre {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .chat__header .link {
   margin-left: auto;
   background: none;
